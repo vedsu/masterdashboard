@@ -69,9 +69,9 @@ class Speaker():
     def update_history(s_name, webinar_topic):
 
         try:
-            result= mongo.db.speaker_data.update_one({
-               {"name": s_name,},{"$addToSet":{"history":webinar_topic}}
-           })
+            result= mongo.db.speaker_data.update_one(
+               {"name": s_name},{"$addToSet":{"history":webinar_topic}}
+           )
             return result.modified_count
         except Exception as e:
             return {"success":False, "message":str(e)}
