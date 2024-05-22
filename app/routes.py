@@ -12,6 +12,7 @@ import re
 import io
 import base64
 from PIL import Image
+from datetime import datetime
 
 @app.route('/', methods =['POST'])
 def master_login():
@@ -62,7 +63,7 @@ def webinar_panel():
         "topic":webinar["topic"],
         "industry":webinar["industry"],
         "speaker":webinar["speaker"],
-        "date":webinar["date"],
+        "date":webinar["date_time"],
         "time":webinar["time"],
         "timeZone":webinar["timeZone"],
         "duration":webinar["duration"],
@@ -102,6 +103,12 @@ def create_webinar():
     if request.method in ['POST']:
         webinar_topic = request.json.get("topic")
         speaker = request.json.get("speaker")
+        date_time = request.json.get("date")
+        # Parse the datetime string
+        dt = datetime.strptime(date_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+        # Extract the date and time as separate strings
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M:%S.%f")[:-10]  # Trim the last three digits of microseconds to match milliseconds
         
         webinar_data ={
         
@@ -110,8 +117,9 @@ def create_webinar():
         "topic":webinar_topic,
         "speaker":speaker,
         "industry":request.json.get("industry"),
-        "date":request.json.get("date"),
-        "time":request.json.get("time"),
+        "date_time":date_time,
+        "time":time_str,
+        "date":date_str,
         "timeZone":request.json.get("timeZone"),
         "duration":request.json.get("duration"),
         "category":request.json.get("category"),
@@ -160,7 +168,7 @@ def update_webinar_panel(w_id):
         "topic":webinar ["topic"],
         "industry":webinar ["industry"],
         "speaker":webinar ["speaker"],
-        "date":webinar ["date"],
+        "date":webinar ["date_time"],
         "time":webinar ["time"],
         "timeZone":webinar["timeZone"],
         "duration":webinar["duration"],
@@ -203,6 +211,12 @@ def update_webinar_panel(w_id):
             return jsonify({"Error": "No data found"}),400
         
     elif request.method in ['PUT']:
+        date_time = request.json.get("date")
+        # Parse the datetime string
+        dt = datetime.strptime(date_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+        # Extract the date and time as separate strings
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M:%S.%f")[:-10]  # Trim the last three digits of microseconds to match milliseconds
         
         
         webinar_data = {
@@ -211,8 +225,9 @@ def update_webinar_panel(w_id):
         "topic":request.json.get("topic"),
         "industry":request.json.get("industry"),
         "speaker":request.json.get("speaker"),
-        "date":request.json.get("date"),
-        "time":request.json.get("time"),
+        "date_time":date_time
+        "date":date_str,
+        "time":time_str,
         "timeZone":request.json.get("timeZone"),
         "duration":request.json.get("duration"),
         "category":request.json.get("category"),
