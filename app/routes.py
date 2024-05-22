@@ -225,7 +225,7 @@ def update_webinar_panel(w_id):
         "topic":request.json.get("topic"),
         "industry":request.json.get("industry"),
         "speaker":request.json.get("speaker"),
-        "date_time":date_time
+        "date_time":date_time,
         "date":date_str,
         "time":time_str,
         "timeZone":request.json.get("timeZone"),
