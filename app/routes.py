@@ -411,6 +411,26 @@ def order_panel():
             order_data.append(order_dict)
         return jsonify(order_data), 200
 
+@app.route('/category', methods = ['GET', 'POST'])
+def category():
+    
+    if request.method in 'GET':
+        industry_data =  Category.industry()
+        industry_datalist = []
+        for industry in industry_data:
+            industry_dict={
+            "industry": industry["industry"],
+            "categories": industry["categories"]
+            }
+            industry_datalist.append(industry_dict)
+
+        return jsonify(industry_datalist)
+    if request.method in 'POST':
+        industry_selected = request.json.get("industry")
+        category_added = request.json.get("category")
+        return Category.categories(industry_selected,category_added)
+
+
 @app.route('/order_panel/<int:o_id>', methods = ['GET'])
 def order_detail(o_id):
     
@@ -448,6 +468,5 @@ def order_detail(o_id):
                 return send_file(pdf_content_b64, as_attachment=True, download_name='oder_catalog.pdf'), order_dict
             else:
                 return order_dict
-
 
 
