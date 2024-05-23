@@ -298,12 +298,13 @@ def create_speaker():
 
         speaker_data ={
             "id": id,
-            "name" :request.form.get("name"),
-            "email": request.form.get("email"),
-            "industry": request.form.get("industry"),
-            "contact" : request.form.get("contact"),
+            "name" :request.json.get("name"),
+            "email": request.json.get("email"),
+            "industry": request.json.get("industry"),
+            "country_code": request.json.get("country_code"),
+            "contact" : request.json.get("contact"),
             "status":"Active",
-            "bio": request.form.get("bio"),
+            "bio": request.json.get("bio"),
             "history": [],
             "photo":image
 
@@ -337,6 +338,7 @@ def update_speaker_panel(s_id):
                 "status": speaker ["status"],
                 "bio": speaker ["bio"],
                 "contact" :speaker ["contact"],
+                "country_code": speaker["country_code"],
                 "history": history
             }
             # Convert the bytes into a PIL image
@@ -364,9 +366,12 @@ def update_speaker_panel(s_id):
         speaker_dict = {
             "id": s_id,
             "name": speaker["name"],
+            "email":speaker ["email"],
             "industry": speaker["industry"],
             "status": speaker["status"],
             "bio": speaker["bio"],
+            "country_code": speaker["country_code"],
+            "contact" :speaker ["contact"],
             "photo":binary_data,
             "history": history
         }
