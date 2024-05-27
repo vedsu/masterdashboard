@@ -6,14 +6,45 @@ class Speaker():
     @staticmethod
     def view_speaker():
         
+        # Speaker name list for drop down menu
         speaker_list =[]
-        
+         
         try:
-            speaker_list = list(mongo.db.speaker_data.find({}))
-            return speaker_list
+            speaker_data = list(mongo.db.speaker_data.find({}))
+            for speaker in speaker_data:
+                speaker_list.append(speaker["name"])
         
         except Exception as e:
-            return {"success":True, "message":str(e)}
+            speaker_list = []
+        
+        return speaker_list
+    
+    @staticmethod
+    def list_speaker():
+        
+        # Speaker name list for drop down menu
+        speaker_list = []
+         
+        try:
+            speaker_data = list(mongo.db.speaker_data.find({}))
+            for speaker in speaker_data:
+                
+                speaker_dict ={
+
+                "id":speaker["id"],
+                "name":speaker["name"],
+                "email":speaker["email"],
+                "contact": speaker["contact"],
+                "industry":speaker["industry"],
+                "status":speaker["status"],
+                "bio":speaker["bio"],
+                }
+                speaker_list.append(speaker_dict)
+        
+        except Exception as e:
+            speaker_list = []
+        
+        return speaker_list
         
     @staticmethod
     def create_speaker(speaker_data):
@@ -27,12 +58,29 @@ class Speaker():
         
     @staticmethod
     def data_speaker(s_id):
-
+        
+        speaker_info = None  
         try:
-            speaker = list(mongo.db.speaker_data.find({"id":s_id}))
-            return speaker
+            speaker_data = list(mongo.db.speaker_data.find({"id":s_id}))
+            speaker = speaker_data[0]
+            speaker_dict={
+                "id": speaker ["id"],
+                "name": speaker ["name"],
+                "email":speaker ["email"],
+                "industry": speaker ["industry"],
+                "status": speaker ["status"],
+                "bio": speaker ["bio"],
+                "contact" :speaker ["contact"],
+                "photo": speaker["photo"],
+                "history": speaker["history"]
+            }
+            
+            speaker_info = speaker_dict
         except Exception as e:
-            return None
+            speaker_info = None 
+            
+        
+        return speaker_info
     
 
     @staticmethod

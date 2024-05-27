@@ -6,13 +6,23 @@ class Category():
 
     @staticmethod
     def industry():
-        industry_data = []
+        industry_list = []
 
         try:
             industry_data = list(mongo.db.category_data.find({}))
+            for industry in industry_data:
+                industry_dict = {
+                    "industry": industry["industry"],
+                    "categories": industry["categories"]
+                }
+                industry_list.append(industry_dict)
+                
+        
+        
         except Exception as e:
-            industry_data = []
-        return industry_data
+            industry_list = []
+        
+        return industry_list
     
     @staticmethod
     def categories(industry, category):

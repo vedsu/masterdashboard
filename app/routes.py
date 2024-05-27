@@ -1,6 +1,6 @@
-# routing
+# Routing
 
-from flask import request, jsonify, send_file
+from flask import request, jsonify
 from app import app
 from app import mongo
 from app.model_login import Login
@@ -8,14 +8,22 @@ from app.model_webinar import Webinar
 from app.model_speaker import Speaker
 from app.model_order import Order
 from app.model_category import Category
+from app.model_website import Website
+
+import string
+import random
 from bson import Binary
 import re
 import io
 import base64
 from PIL import Image
+import os
 from datetime import datetime
+from app import s3_client, s3_resource
 
-@app.route('/', methods =['POST'])
+
+
+@app.route('/employee', methods =['POST'])
 def master_login():
     if request.method in 'POST':
         login_email = request.json.get("Email")
@@ -40,64 +48,23 @@ def process_url(topic):
 
    
 
-@app.route('/webinar_panel', methods = ['GET'])
+@app.route('/employee/webinar_panel', methods = ['GET'])
 def webinar_panel():
     
     webinar_list = Webinar.view_webinar()
     speaker_list = Speaker.view_speaker()
-    
-    # Speaker name list for drop down menu
-    speaker_namedata = []
-    
-    # Webinar list for display
-    webinar_data = []
+    website_list = Website.view_website()
+    # industry_list = Category.industry()
         
     if request.method in 'GET':
-        for speaker in speaker_list:
-            speaker_namedata.append(speaker["name"])
+       
+        return jsonify(webinar_list, speaker_list, website_list),200
         
-        for webinar in webinar_list:
-            webinar_dict ={
         
-        "id":webinar["id"],
-
-        "topic":webinar["topic"],
-        "industry":webinar["industry"],
-        "speaker":webinar["speaker"],
-        "date":webinar["date_time"],
-        "time":webinar["time"],
-        "timeZone":webinar["timeZone"],
-        "duration":webinar["duration"],
-        "category":webinar["category"],
-        
-        "sessionLive":webinar["sessionLive"],
-        "priceLive":webinar["priceLive"],
-        "urlLive":webinar["urlLive"],
-        
-        "sessionRecording":webinar["sessionRecording"],
-        "priceRecording":webinar["priceRecording"],
-        "urlRecording":webinar["urlRecording"],
-
-        "sessionDigitalDownload":webinar["sessionDigitalDownload"],
-        "priceDigitalDownload":webinar["priceDigitalDownload"],
-        "urlDigitalDownload":webinar["urlDigitalDownload"],
-        
-        "sessionTranscript":webinar["sessionTranscript"],
-        "priceTranscript":webinar["priceTranscript"],
-        "urlTranscript":webinar["urlTranscript"],
-
-        "status":webinar["status"],
-        "webinar_url": webinar["webinar_url"],
-        "description":webinar["description"],
-            
-            }
-            
-            webinar_data.append(webinar_dict)
-        return jsonify(webinar_data, speaker_namedata)
     
     
 
-@app.route('/webinar_panel/create_webinar', methods= ['POST'])
+@app.route('/employee/webinar_panel/create_webinar', methods= ['POST'])
 def create_webinar():
     
     id = len(list(mongo.db.webinar_data.find({}))) + 1
@@ -105,8 +72,11 @@ def create_webinar():
         webinar_topic = request.json.get("topic")
         speaker = request.json.get("speaker")
         date_time = request.json.get("date")
+        website = request.json.get("website")
+        
         # Parse the datetime string
         dt = datetime.strptime(date_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+        
         # Extract the date and time as separate strings
         date_str = dt.strftime("%Y-%m-%d")
         time_str = dt.strftime("%H:%M:%S.%f")[:-10]  # Trim the last three digits of microseconds to match milliseconds
@@ -142,76 +112,50 @@ def create_webinar():
         "urlTranscript":request.json.get("urlTranscript"),
 
         "status":"Active",
-        "webinar_url": process_url(request.json.get("topic")),
+        "webinar_url": process_url(webinar_topic),
+        "website": website,
         "description":request.json.get("description"),
         
         }
         response_create_webinar = Webinar.create_webinar(webinar_data)
         respone_history_speaker = Speaker.update_history(speaker,webinar_topic)
-
-    return response_create_webinar, respone_history_speaker
+        response = Website.insert_webinar(website, webinar_topic)
+        if response.get("success") == True:
+            return jsonify(response_create_webinar,respone_history_speaker,response),201
+        else:
+            response, 403
+            
     
-
-
-@app.route('/webinar_panel/<int:w_id>', methods= ['GET','PUT','PATCH','DELETE'])
+@app.route('/employee/webinar_panel/<int:w_id>', methods= ['GET','PUT','POST','DELETE'])
 def update_webinar_panel(w_id):    
     # w_id = request.json.get("w_id")
     
     webinar_data = Webinar.data_webinar(w_id)
-    webinar = webinar_data[0]
+    
     if request.method in ['GET']:
         
-        if webinar:    
-            webinar_data_dict ={
-            
-            "id":webinar ["id"],
-
-        "topic":webinar ["topic"],
-        "industry":webinar ["industry"],
-        "speaker":webinar ["speaker"],
-        "date":webinar ["date_time"],
-        "time":webinar ["time"],
-        "timeZone":webinar["timeZone"],
-        "duration":webinar["duration"],
-        "category":webinar["category"],
-        
-        "sessionLive":webinar ["sessionLive"],
-        "priceLive":webinar ["priceLive"],
-        "urlLive":webinar ["urlLive"],
-        
-        "sessionRecording":webinar ["sessionRecording"],
-        "priceRecording":webinar ["priceRecording"],
-        "urlRecording":webinar ["urlRecording"],
-
-        "sessionDigitalDownload":webinar ["sessionDigitalDownload"],
-        "priceDigitalDownload":webinar ["priceDigitalDownload"],
-        "urlDigitalDownload":webinar ["urlDigitalDownload"],
-        
-        "sessionTranscript":webinar ["sessionTranscript"],
-        "priceTranscript":webinar ["priceTranscript"],
-        "urlTranscript":webinar ["urlTranscript"],
-
-        "status":webinar ["status"],
-        "webinar_url": webinar ["webinar_url"],
-        "description":webinar ["description"],
-
-        }
-            return webinar_data_dict,200
-        else:
-            return {"success":False, "message":"failed to retrieve webinar info"}
-
-    elif request.method in ['PATCH']:
+        return webinar_data,200
+       
+    elif request.method in 'POST':
         
         webinar_status = request.json.get("status")
         
-        if webinar_status:
-            
-            return Webinar.edit_webinar(w_id, webinar_status)
+        response = Webinar.edit_webinar(w_id, webinar_status)
+        
+        if response.get("success") == True:
+            return response, 201
         
         else:
-            return jsonify({"Error": "No data found"}),400
+            return response,304
+                
+        
         
     elif request.method in ['PUT']:
+        
+        topic = request.json.get("topic")
+        speaker = request.json.get("speaker")
+        website = request.json.get("website")
+        
         date_time = request.json.get("date")
         # Parse the datetime string
         dt = datetime.strptime(date_time, "%Y-%m-%dT%H:%M:%S.%fZ")
@@ -219,13 +163,12 @@ def update_webinar_panel(w_id):
         date_str = dt.strftime("%Y-%m-%d")
         time_str = dt.strftime("%H:%M:%S.%f")[:-10]  # Trim the last three digits of microseconds to match milliseconds
         
-        
         webinar_data = {
-        "id":w_id ,
+        "id":w_id,
         
-        "topic":request.json.get("topic"),
+        "topic":topic,
         "industry":request.json.get("industry"),
-        "speaker":request.json.get("speaker"),
+        "speaker":speaker,
         "date_time":date_time,
         "date":date_str,
         "time":time_str,
@@ -250,229 +193,205 @@ def update_webinar_panel(w_id):
         "urlTranscript":request.json.get("urlTranscript"),
 
         "status":request.json.get("status"),
-        "webinar_url": process_url(request.json.get("topic")),
+        "webinar_url": process_url(topic),
+        "website": website,
         "description":request.json.get("description"),
         }
-        if webinar_data:
-            return Webinar.update_webinar(w_id, webinar_data)
         
+        Speaker.update_history(speaker,topic)
+        Website.insert_webinar(website, topic)
+        
+        response = Webinar.update_webinar(w_id, webinar_data)
+        if response.get("success") == True:
+            return response,201
+    
         else:
-            return jsonify({"Error": "No data found"}),400
+            return response,304
         
     elif request.method in ['DELETE']:
          
-        return Webinar.delete_webinar(w_id)
+        response = Webinar.delete_webinar(w_id)
+        
+        if response.get("success") == True:
+            
+            return response, 202
+        else:
+            return response, 204
     
 
-@app.route('/speaker_panel', methods = ['GET'])
+@app.route('/employee/speaker_panel', methods = ['GET'])
 def speaker_panel():
     
-    speaker_list = Speaker.view_speaker()
+    speaker_list = Speaker.list_speaker()
     if request.method in 'GET':
-        speaker_data = []
-        for speaker in speaker_list:
-            speaker_dict ={
-
-            "id":speaker["id"],
-            "name":speaker["name"],
-            "email":speaker["email"],
-            "industry":speaker["industry"],
-            "status":speaker["status"],
-            "bio":speaker["bio"],
-            }
-            speaker_data.append(speaker_dict)
-        return jsonify(speaker_data)
-    
-
-@app.route('/speaker_panel/create_speaker', methods = ['POST'])
+        return jsonify(speaker_list),200
+       
+           
+@app.route('/employee/speaker_panel/create_speaker', methods = ['POST'])
 def create_speaker():
     speaker_list = Speaker.view_speaker()
     id = len(speaker_list) +1
-    image = None
     
-    if request.method in 'POST':
-        image_file = request.files.get("photo")
-        if image_file:
-            image_data = image_file.read()
-            image = base64.b64encode(image_data)
-
+    if request.method == 'POST':
+         
+        speaker_name = request.form.get("name")
+        # initializing size of string
+        N = 3
+        
+        # using random.choices()
+        # generating random strings
+        res = ''.join(random.choices(string.ascii_uppercase +
+                                    string.digits, k=N))
+        
+        bucket_name = "vedsubrandwebsite"
+        object_key = speaker_name+"_"+res
+        s3_url = f"https://{bucket_name}.s3.amazonaws.com/speaker/{object_key}.jpeg"
+        image = request.files.get("photo")
+        s3_client.put_object(
+        Body=image, 
+        Bucket=bucket_name, 
+        Key=f'speaker/{object_key}.jpeg'
+    )
         speaker_data ={
             "id": id,
-            "name" :request.json.get("name"),
-            "email": request.json.get("email"),
-            "industry": request.json.get("industry"),
-            "country_code": request.json.get("country_code"),
-            "contact" : request.json.get("contact"),
+            "name" :speaker_name,
+            "email": request.form.get("email"),
+            "industry": request.form.get("industry"),
+            "contact" : request.form.get("contact"),
             "status":"Active",
-            "bio": request.json.get("bio"),
+            "bio": request.form.get("bio"),
             "history": [],
-            "photo":image
+            "photo": s3_url,
 
         }
         
-        response_create_speaker = Speaker.create_speaker(speaker_data)
-        return response_create_speaker
+        response = Speaker.create_speaker(speaker_data)
+        if response.get("success") == True:
+            return response,201
+        else:
+            return response,403
     
 
-
-@app.route('/speaker_panel/<int:s_id>', methods =['GET','PUT', 'PATCH', 'DELETE'])
+@app.route('/employee/speaker_panel/<int:s_id>', methods =['GET','PUT', 'POST', 'DELETE'])
 def update_speaker_panel(s_id):
     
-    speaker_data = Speaker.data_speaker(s_id)
-    speaker = speaker_data[0]
-    image = None
-    image_data = speaker.get("photo")
-    if image_data:
-        binary_data = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(binary_data))
-
-    if request.method in 'GET':
-        if speaker:
-            history = speaker.get('history')
-            
-            speaker_dict={
-                "id": speaker ["id"],
-                "name": speaker ["name"],
-                "email":speaker ["email"],
-                "industry": speaker ["industry"],
-                "status": speaker ["status"],
-                "bio": speaker ["bio"],
-                "contact" :speaker ["contact"],
-                "country_code": speaker["country_code"],
-                "history": history
-            }
-            # Convert the bytes into a PIL image
-            if image:
-                # speaker_dict["photo"] = process_image_data
-                # process_image_data = process_image(image_binary)
-                # image.show()
-                return send_file(image, mimetype='image/jpeg'), speaker_dict
-                # return (speaker_dict)
-            else:
-                return speaker_dict        
     
-    elif request.method in "PATCH":
+    
+    if request.method in 'GET':
+        speaker_data = Speaker.data_speaker(s_id)
+       
+        return jsonify(speaker_data),200        
+            
+    
+    elif request.method in 'POST':
 
         speaker_status = request.json.get("status")
         
-        if speaker_data:
-            return Speaker.edit_speaker(s_id, speaker_status)
+        response = Speaker.edit_speaker(s_id, speaker_status)
+        
+        if response.get("success") == True:
+            return response, 201
         
         else:
-            return jsonify({"Error": "No data found"}), 400
+            return response,304
+        
     
     elif request.method in 'PUT':
-
+        image = request.files.get("photo")
+        speaker_name = request.form.get("name")
+        # initializing size of string
+        N = 3
+        
+        # using random.choices()
+        # generating random strings
+        res = ''.join(random.choices(string.ascii_uppercase +
+                                    string.digits, k=N))
+        bucket_name = "vedsubrandwebsite"
+        object_key = speaker_name+"_"+res
+        s3_url = f"https://{bucket_name}.s3.amazonaws.com/speaker/{object_key}.jpeg"
+        s3_client.put_object(
+        Body=image, 
+        Bucket=bucket_name, 
+        Key=f'speaker/{object_key}.jpeg')
+        
         speaker_dict = {
             "id": s_id,
-            "name": speaker["name"],
-            "email":speaker ["email"],
-            "industry": speaker["industry"],
-            "status": speaker["status"],
-            "bio": speaker["bio"],
-            "country_code": speaker["country_code"],
-            "contact" :speaker ["contact"],
-            "photo":binary_data,
-            "history": history
+            "name": speaker_name,
+            "email": request.form.get("email"),
+            "contact" : request.form.get("contact"),
+            "industry": request.form.get("industry"),
+            "status": request.form.get("status"),
+            "bio": request.form.get("bio"),
+            "photo": s3_url,
+            
         }
-
-        if speaker_dict:
-            return Speaker.update_speaker(s_id, speaker_dict)
         
+        response= Speaker.update_speaker(s_id, speaker_dict)
+        if response.get("success") == True:
+            return response,201
+    
         else:
-            return jsonify({"Error": "No data found"}),400
+            return response,304
+      
         
     elif request.method in 'DELETE':
 
-        return Speaker.delete_speaker(s_id)
+        response= Speaker.delete_speaker(s_id)
+    
+        if response.get("success") == True:
+            
+            return response, 202
+        else:
+            return response, 204
 
 
-@app.route('/order_panel', methods =['GET'])
+@app.route('/employee/order_panel', methods =['GET'])
 def order_panel():
     
-    orderlist = Order.view_order()
+    order_list = Order.view_order()
     if request.method in 'GET':
-        order_data = []
-        for order in orderlist:
-            
-            order_dict = {
-                "id": order ["id"],
-                "orderdate": order["orderdate"],
-                "webinardate": order["webinardate"],
-                "topic": order["topic"],
-                "session": order["sessiion"],
-                "customername": order["customername"],
-                "customeremail": order["customeremail"],
-                "billingemail": order["billingemail"],
-                "orderamount": order["amount"],
-                "paymentstatus": order["paymentstatus"],
-                "country" : order["country"],
-                "state" : order["state"],
-                "city" : order["city"],
-                "zipcode" : order["zipcode"],
-                "address": order["address"]
+        
+        return jsonify(order_list), 200
 
-            }
-
-            order_data.append(order_dict)
-        return jsonify(order_data), 200
-
-@app.route('/category', methods = ['GET', 'POST'])
+@app.route('/employee/category', methods = ['GET', 'POST'])
 def category():
     
     if request.method in 'GET':
+        
         industry_data =  Category.industry()
-        industry_datalist = []
-        for industry in industry_data:
-            industry_dict={
-            "industry": industry["industry"],
-            "categories": industry["categories"]
-            }
-            industry_datalist.append(industry_dict)
-
-        return jsonify(industry_datalist)
-    if request.method in 'POST':
+        return jsonify(industry_data),200
+        
+    elif request.method in 'POST':
         industry_selected = request.json.get("industry")
         category_added = request.json.get("category")
-        return Category.categories(industry_selected,category_added)
+        
+        response = Category.categories(industry_selected,category_added)
+        if response.get("success") == True:
+            return response,201
+        else:
+            return response,403
 
-
-@app.route('/order_panel/<int:o_id>', methods = ['GET'])
+@app.route('/employee/order_panel/<int:o_id>', methods = ['GET'])
 def order_detail(o_id):
     
     order_data = Order.order_data(o_id)
-    order = order_data[0]
     
     if request.method in 'GET':
-        if order:
+           return order_data,200
            
-            order_dict = {
-                "id": order ["id"],
-                "orderdate": order["orderdate"],
-                "webinardate": order["webinardate"],
-                "topic": order["topic"],
-                "session": order["sessiion"],
-                "customername": order["customername"],
-                "customeremail": order["customeremail"],
-                "billingemail": order["billingemail"],
-                "orderamount": order["amount"],
-                "paymentstatus": order["paymentstatus"],
-                "country" : order["country"],
-                "state" : order["state"],
-                "city" : order["city"],
-                "zipcode" : order["zipcode"],
-                "address": order["address"]
-
-            }
-
-
-            document = order["document"]
-            if document:
-                pdf_content_b64 = base64.b64encode(document).decode('utf-8')
-
-                
-                return send_file(pdf_content_b64, as_attachment=True, download_name='oder_catalog.pdf'), order_dict
-            else:
-                return order_dict
-
-
+            
+@app.route('/employee/website_panel', methods= ['GET', 'POST'])
+def website_utility():
+    
+    if request.method in 'GET':
+        website_list = Website.view_website()
+        return jsonify(website_list),200
+    
+    elif request.method in 'POST':
+        
+        website=request.json.get("website")
+        response = Website.insert_website(website)
+        if response.get("success") == True:
+            return response,201
+        else:
+            return response,403
